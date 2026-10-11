@@ -32,7 +32,7 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '20kb' }));
 app.use((req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff');
-  res.set('Referrer-Policy', 'same-origin');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
 
