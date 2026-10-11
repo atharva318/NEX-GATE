@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live map - NEX-GATE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body class="mapPage">
+<div id="map"></div>
+
+<header class="bar">
+  <a class="brand" href="/admin"><span class="mark"></span>NEX-GATE</a>
+  <nav class="nav"><a class="on" href="/admin">Live map</a><a href="/register">Register cards</a></nav>
+  <span class="grow"></span>
+  <div class="tiles" id="tiles"><button data-tile="dark" class="on">Night</button><button data-tile="sat">Satellite</button><button data-tile="street">Street</button></div>
+  <button class="btn quiet sm" id="fit">Fit all</button>
+  <button class="btn quiet sm" id="snd">Sound off</button>
+  <span class="live" id="live"><i></i><span>Connecting</span></span>
+  <span class="clock" id="clock"></span>
+  <button class="btn quiet sm" onclick="signOut()">Sign out</button>
+</header>
+
+<section class="fence" id="fence">
+  <div class="view">
+    <h2>Geofence</h2>
+    <p id="fsum">Loading</p>
+    <div class="row"><button class="btn sm" id="fedit">Edit boundary</button></div>
+  </div>
+  <div class="edit">
+    <h2>Editing boundary</h2>
+    <div class="seg" id="fmode"><button data-m="circle">Circle</button><button data-m="polygon">Polygon</button></div>
+    <div id="fcircle">
+      <div class="range"><div><span>Radius</span><span id="rv">300 m</span></div><input type="range" id="rad" min="50" max="2000" step="10"></div>
+      <p>Drag the blue dot to move the centre. Drag the white square to resize.</p>
+    </div>
+    <div id="fpoly">
+      <p>Click the map to add corners. Drag a corner to move it, right-click to delete it.</p>
+      <div class="row"><button class="btn sm" id="undo">Remove last corner</button><button class="btn sm" id="square">Reset to square</button></div>
+    </div>
+    <div class="row"><button class="btn primary sm" id="fsave">Save boundary</button><button class="btn quiet sm" id="fcancel">Cancel</button></div>
+  </div>
+</section>
+
+<aside class="side">
+  <div class="stats">
+    <div class="stat in" id="sIn"><b>0</b><span>Inside</span></div>
+    <div class="stat out" id="sOut"><b>0</b><span>Outside</span></div>
+    <div class="stat off" id="sOff"><b>0</b><span>Offline</span></div>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-p="pAct" class="on">Gate activity<em id="nAct">0</em></button>
+    <button data-p="pCards">ID cards<em id="nCards">0</em></button>
+  </div>
+  <div class="pane on" id="pAct">
+    <div class="buffer"><span id="bufTxt">0 of 20 entries</span><div class="meter"><i id="bufBar" style="width:0"></i></div><button class="btn quiet sm" id="clr">Clear</button></div>
+    <ul class="list" id="logList"></ul>
+  </div>
+  <div class="pane" id="pCards"><ul class="list" id="cardList"></ul></div>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="/assets/common.js"></script>
+<script src="/assets/admin.js"></script>
+</body></html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Register cards - NEX-GATE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body class="regPage">
+<header class="bar">
+  <a class="brand" href="/admin"><span class="mark"></span>NEX-GATE</a>
+  <nav class="nav"><a href="/admin">Live map</a><a class="on" href="/register">Register cards</a></nav>
+  <span class="grow"></span>
+  <span class="live" id="live"><i></i><span>Connecting</span></span>
+  <button class="btn quiet sm" onclick="signOut()">Sign out</button>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="stage" id="stage">
+      <div class="idcard" id="idcard">
+        <div class="rings"></div><div class="sheen"></div>
+        <div class="top"><span class="mark" style="width:22px;height:22px"></span>NEX-GATE<small>Campus ID</small></div>
+        <div class="photo" id="pvAv">?</div>
+        <h3 id="pvName">Student name</h3>
+        <div class="sub"><b id="pvRoll">Roll number</b><br><span id="pvDept">Department</span></div>
+        <div class="code"><div class="barcode"></div><b id="pvId">NEX-000000</b><small>Tracked while the card is on campus</small></div>
+      </div>
+    </div>
+
+    <div class="lede">
+      <h1>Give a student a card that clocks them in and out</h1>
+      <p>Switch on the ESP32-C3 card with the student's phone hotspot nearby. It shows up below within a few seconds. Pick it, add the student's details, and it is live on the map.</p>
+
+      <div class="detected">
+        <h2>Cards waiting to be registered <span class="chip in" id="dCount">0</span></h2>
+        <div class="chips" id="dChips"><span class="none">No new cards heard yet. Power one on and keep it connected to a phone hotspot.</span></div>
+      </div>
+
+      <form class="form" id="form" autocomplete="off" novalidate>
+        <div class="field full"><label for="fId">Card ID</label><input id="fId" placeholder="Pick a detected card, or type the ID printed by the card" maxlength="32"><small>Letters, numbers, dash and underscore. The card shows its ID on its own page and in the serial monitor.</small></div>
+        <div class="field"><label for="fName">Student name</label><input id="fName" placeholder="Full name" maxlength="60"></div>
+        <div class="field"><label for="fRoll">Roll or enrolment number</label><input id="fRoll" placeholder="e.g. 22EC104" maxlength="30"></div>
+        <div class="field full"><label for="fDept">Department and year</label><input id="fDept" placeholder="e.g. Electronics, 3rd year" maxlength="40"></div>
+        <div class="actions full"><button class="btn primary" id="fGo" type="submit" style="padding:11px 22px">Register card</button><button class="btn quiet" id="fClear" type="button">Clear form</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="registry">
+    <div class="rhead">
+      <h2>Registered cards <span class="chip off" id="rCount">0</span></h2>
+      <span class="grow"></span>
+      <input id="q" type="search" placeholder="Search name, roll or card ID" aria-label="Search registered cards">
+      <button class="btn sm" id="bk" title="Copy a JSON backup you can paste into the STORE_SEED setting on Render">Copy backup</button>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Student</th><th>Department</th><th>Card ID</th><th>Status</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </section>
+</main>
+
+<script src="/assets/common.js"></script>
+<script src="/assets/register.js"></script>
+</body></html>

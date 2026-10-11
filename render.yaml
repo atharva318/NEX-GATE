@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: nex-gate
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ADMIN_PASSWORD
+        sync: false          # you type this in the Render dashboard
+      - key: DEVICE_KEY
+        generateValue: true  # copy this value into firmware/nex_card/config.h
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: STORE_SEED
+        sync: false          # optional: paste backup JSON from the Register page

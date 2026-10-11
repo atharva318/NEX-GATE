@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in - NEX-GATE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body class="gate">
+  <div class="radar" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <main class="gatebox" id="box">
+    <div class="brand"><span class="mark"></span>NEX-GATE</div>
+    <h1>Campus gate control</h1>
+    <p>Sign in to watch ID cards cross the college boundary and to register new cards.</p>
+    <div class="field"><label for="pw">Admin password</label><input id="pw" type="password" autocomplete="current-password" autofocus></div>
+    <div class="err" id="err" role="alert"></div>
+    <button class="btn primary" id="go" style="width:100%;padding:12px">Open live map</button>
+  </main>
+<script src="/assets/common.js"></script>
+<script>
+async function go(){
+  const b=$('#go'); b.disabled=true;
+  try{ await api('/api/login','POST',{password:$('#pw').value}); location.href='/admin'; }
+  catch(e){ $('#err').textContent=e.message; const bx=$('#box'); bx.classList.remove('shake'); void bx.offsetWidth; bx.classList.add('shake'); $('#pw').select(); }
+  b.disabled=false;
+}
+$('#go').onclick=go; $('#pw').onkeydown=(e)=>{ if(e.key==='Enter') go(); };
+</script>
+</body></html>
