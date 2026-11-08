@@ -235,8 +235,7 @@
     },
     card(c) {
       const prev = cards.get(c.id);
-      c.trail = prev ? prev.trail.slice() : [];
-      if (c.lat != null) { const l = c.trail[c.trail.length - 1]; if (!l || l[0] !== c.lat || l[1] !== c.lng) c.trail.push([c.lat, c.lng]); if (c.trail.length > 40) c.trail.shift(); }
+      if (!Array.isArray(c.trail)) c.trail = prev ? prev.trail.slice() : [];
       cards.set(c.id, c); upsertMarker(c); renderStats(); renderCards();
     },
     log(d) {

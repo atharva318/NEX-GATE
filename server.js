@@ -157,7 +157,12 @@ function evaluate(c, m, lat, lng, acc, ts) {
   const inside = insideFence(lat, lng);
   if (c.inside === null) {                 // first fix after (re)start: just establish the baseline
     c.inside = inside; c.cand = null; c.streak = 0;
-    if (inside) addLog('LOGIN', m, lat, lng, ts);
+    if (inside) {
+      c.trail = [[lat, lng]];
+      addLog('LOGIN', m, lat, lng, ts);
+    } else {
+      c.trail = [];
+    }
     return;
   }
   if (inside === c.inside) { c.cand = null; c.streak = 0; return; }
@@ -165,6 +170,7 @@ function evaluate(c, m, lat, lng, acc, ts) {
   if (c.cand === inside) c.streak++; else { c.cand = inside; c.streak = 1; }
   if (c.streak >= CONFIRM_READINGS) {
     c.inside = inside; c.cand = null; c.streak = 0;
+    c.trail = inside ? [[lat, lng]] : [];
     addLog(inside ? 'LOGIN' : 'LOGOUT', m, lat, lng, ts);
   }
 }
@@ -207,6 +213,7 @@ app.post('/api/login', (req, res) => {
 });
 app.post('/api/logout', (req, res) => { res.clearCookie('nex_session'); res.json({ ok: true }); });
 app.get('/api/me', apiAuth, (req, res) => res.json({ ok: true }));
+app.get('/api/geofence', apiAuth, (req, res) => res.json({ ok: true, geofence }));
 
 /* ------------------------------------------------------- device endpoint */
 app.post('/api/ping', (req, res) => {
@@ -238,11 +245,17 @@ app.post('/api/ping', (req, res) => {
   c.lastSeen = now; c.rssi = rssi;
   if (hasFix) {
     c.lat = lat; c.lng = lng; c.acc = acc; c.fixTs = now;
-    c.trail.push([lat, lng]);
-    if (c.trail.length > TRAIL_MAX) c.trail.shift();
     evaluate(c, m, lat, lng, acc, now);
+    if (c.inside) {
+      if (!c.trail.length || c.trail[c.trail.length - 1][0] !== lat || c.trail[c.trail.length - 1][1] !== lng) {
+        c.trail.push([lat, lng]);
+      }
+      if (c.trail.length > TRAIL_MAX) c.trail.shift();
+    } else {
+      c.trail = [];
+    }
   }
-  emit('card', pub(id, false));
+  emit('card', pub(id, true));
   res.json({ ok: true, registered: true, inside: c.inside, name: m.name });
 });
 
@@ -281,6 +294,7 @@ app.put('/api/geofence', apiAuth, (req, res) => {
   geofence = f;
   for (const [id, c] of live) {                // re-baseline silently so editing the fence never fakes a logout
     if (c.lat != null) { c.inside = insideFence(c.lat, c.lng); c.cand = null; c.streak = 0; }
+    c.trail = c.inside ? (c.lat != null ? [[c.lat, c.lng]] : []) : [];
   }
   saveStore();
   emit('fence', geofence);
