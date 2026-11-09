@@ -1,7 +1,7 @@
 'use strict';
 /*  NEX-GATE server
- *  - ID cards (ESP32-C3) POST their phone-supplied GPS to /api/ping
- *  - Server decides inside/outside the geofence, logs LOGIN / LOGOUT
+ *  - ESP32 Dev Module cards ping /api/ping; paired phones report GPS over HTTPS
+ *  - Server decides inside/outside the geofence and logs LOGIN / LOGOUT
  *  - Only the last 20 events are kept, in memory. No database, no cloud storage.
  *  - Admin pages get live updates through Server-Sent Events.
  */
@@ -41,6 +41,7 @@ let geofence = { type: 'circle', center: { lat: 18.6298, lng: 73.7997 }, radius:
 const cards = new Map();    // id -> {id,name,roll,dept,createdAt}   (registry)
 const live = new Map();     // id -> runtime state
 const pending = new Map();  // unregistered ids that have been heard
+const trackerTokens = new Map(); // id -> SHA-256 hash of the phone GPS link token
 let log = [];               // newest first, max 20
 
 const ID_RE = /^[A-Za-z0-9_-]{3,32}$/;
@@ -88,17 +89,32 @@ function loadStore() {
     const f = cleanFence(o.geofence);
     if (f) geofence = f;
     if (Array.isArray(o.cards)) for (const c of o.cards) { const m = cleanCard(c); if (m) cards.set(m.id, m); }
+    if (o.trackerTokens && typeof o.trackerTokens === 'object' && !Array.isArray(o.trackerTokens)) {
+      for (const [id, hash] of Object.entries(o.trackerTokens)) {
+        if (ID_RE.test(id) && typeof hash === 'string' && /^[a-f0-9]{64}$/i.test(hash)) trackerTokens.set(id, hash);
+      }
+    }
   };
   try { if (process.env.STORE_SEED) apply(JSON.parse(process.env.STORE_SEED)); } catch (e) { console.warn('[warn] STORE_SEED is not valid JSON'); }
-  try { if (fs.existsSync(DATA_FILE)) apply(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))); } catch (e) { /* ignore */ }
+  try { if (fs.existsSync(DATA_FILE)) apply(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))); }
+  catch (e) { console.error(`[error] Could not load store file ${DATA_FILE}: ${e.message}`); }
 }
 function saveStore() {
+  const tmpFile = DATA_FILE + '.tmp';
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(backup()));
-  } catch (e) { /* ephemeral disks may be read-only - registry then lives in memory/STORE_SEED */ }
+    fs.writeFileSync(tmpFile, JSON.stringify(backup()));
+    fs.renameSync(tmpFile, DATA_FILE);
+    return true;
+  } catch (e) {
+    console.error(`[error] Could not persist store to ${DATA_FILE}: ${e.message}`);
+    try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch (cleanupError) {
+      console.error(`[error] Could not remove temporary store file ${tmpFile}: ${cleanupError.message}`);
+    }
+    return false;
+  }
 }
-const backup = () => ({ geofence, cards: [...cards.values()] });
+const backup = () => ({ geofence, cards: [...cards.values()], trackerTokens: Object.fromEntries(trackerTokens) });
 loadStore();
 
 /* --------------------------------------------------------------- geometry */
@@ -175,6 +191,22 @@ function evaluate(c, m, lat, lng, acc, ts) {
   }
 }
 
+function updateCardFix(id, lat, lng, acc, ts) {
+  const m = cards.get(id);
+  let c = live.get(id);
+  if (!c) { c = { trail: [], inside: null, cand: null, streak: 0 }; live.set(id, c); }
+  c.lat = lat; c.lng = lng; c.acc = acc; c.fixTs = ts;
+  evaluate(c, m, lat, lng, acc, ts);
+  if (c.inside) {
+    if (!c.trail.length || c.trail[c.trail.length - 1][0] !== lat || c.trail[c.trail.length - 1][1] !== lng) c.trail.push([lat, lng]);
+    if (c.trail.length > TRAIL_MAX) c.trail.shift();
+  } else {
+    c.trail = [];
+  }
+  emit('card', pub(id, true));
+  return c;
+}
+
 /* ------------------------------------------------------------------ auth */
 const sign = (v) => crypto.createHmac('sha256', SESSION_SECRET).update(v).digest('hex');
 function makeToken() { const p = String(Date.now() + 12 * 3600e3); return p + '.' + sign(p); }
@@ -244,19 +276,33 @@ app.post('/api/ping', (req, res) => {
   if (!c) { c = { trail: [], inside: null, cand: null, streak: 0 }; live.set(id, c); }
   c.lastSeen = now; c.rssi = rssi;
   if (hasFix) {
-    c.lat = lat; c.lng = lng; c.acc = acc; c.fixTs = now;
-    evaluate(c, m, lat, lng, acc, now);
-    if (c.inside) {
-      if (!c.trail.length || c.trail[c.trail.length - 1][0] !== lat || c.trail[c.trail.length - 1][1] !== lng) {
-        c.trail.push([lat, lng]);
-      }
-      if (c.trail.length > TRAIL_MAX) c.trail.shift();
-    } else {
-      c.trail = [];
-    }
-  }
-  emit('card', pub(id, true));
+    updateCardFix(id, lat, lng, acc, now);
+  } else emit('card', pub(id, true));
   res.json({ ok: true, registered: true, inside: c.inside, name: m.name });
+});
+
+app.post('/api/track', (req, res) => {
+  const b = req.body || {};
+  const id = String(b.id || '');
+  const token = String(b.token || '');
+  const savedHash = trackerTokens.get(id);
+  if (!ID_RE.test(id) || !savedHash || token.length > 200) return res.status(401).json({ error: 'Invalid card tracking link.' });
+  const suppliedHash = crypto.createHash('sha256').update(token).digest();
+  const expectedHash = Buffer.from(savedHash, 'hex');
+  if (suppliedHash.length !== expectedHash.length || !crypto.timingSafeEqual(suppliedHash, expectedHash)) {
+    return res.status(401).json({ error: 'Invalid card tracking link.' });
+  }
+  const lat = num(b.lat), lng = num(b.lng), acc = num(b.acc);
+  if (!okLat(lat) || !okLng(lng) || !Number.isFinite(acc) || acc < 0 || acc > 10000) {
+    return res.status(400).json({ error: 'A valid GPS position and accuracy are required.' });
+  }
+  if (acc > MAX_FLIP_ACCURACY) return res.json({ ok: true, waitingForAccuracy: true, accuracy: Math.round(acc) });
+
+  const now = Date.now();
+  const c = live.get(id);
+  if (!c || !c.lastSeen || now - c.lastSeen > 45000) return res.json({ ok: true, waitingForCard: true });
+  updateCardFix(id, lat, lng, Math.round(acc), now);
+  res.json({ ok: true, waitingForCard: false });
 });
 
 /* --------------------------------------------------------- admin APIs */
@@ -274,16 +320,44 @@ app.post('/api/cards', apiAuth, (req, res) => {
   if (cards.has(m.id)) return res.status(409).json({ error: `Card ${m.id} is already registered.` });
   cards.set(m.id, m);
   pending.delete(m.id);
-  saveStore();
+  if (!saveStore()) {
+    cards.delete(m.id);
+    return res.status(503).json({ error: 'Card could not be saved. Check server storage configuration.' });
+  }
   emit('registry', registryPayload());
   res.json({ ok: true, card: m });
 });
 
+app.post('/api/cards/:id/tracker', apiAuth, (req, res) => {
+  const id = req.params.id;
+  if (!cards.has(id)) return res.status(404).json({ error: 'Card not found.' });
+  const token = crypto.randomBytes(32).toString('base64url');
+  const previousToken = trackerTokens.get(id);
+  trackerTokens.set(id, crypto.createHash('sha256').update(token).digest('hex'));
+  if (!saveStore()) {
+    if (previousToken) trackerTokens.set(id, previousToken);
+    else trackerTokens.delete(id);
+    return res.status(503).json({ error: 'GPS link could not be saved. Check server storage configuration.' });
+  }
+  const protocol = req.secure ? 'https' : 'http';
+  res.json({ ok: true, url: `${protocol}://${req.get('host')}/track?card=${encodeURIComponent(id)}#${token}` });
+});
+
 app.delete('/api/cards/:id', apiAuth, (req, res) => {
   const id = req.params.id;
-  if (!cards.delete(id)) return res.status(404).json({ error: 'Card not found.' });
+  const card = cards.get(id);
+  if (!card) return res.status(404).json({ error: 'Card not found.' });
+  const trackerToken = trackerTokens.get(id);
+  const runtime = live.get(id);
+  cards.delete(id);
+  trackerTokens.delete(id);
   live.delete(id);
-  saveStore();
+  if (!saveStore()) {
+    cards.set(id, card);
+    if (trackerToken) trackerTokens.set(id, trackerToken);
+    if (runtime) live.set(id, runtime);
+    return res.status(503).json({ error: 'Card could not be removed from storage.' });
+  }
   emit('registry', registryPayload());
   res.json({ ok: true });
 });
@@ -291,12 +365,16 @@ app.delete('/api/cards/:id', apiAuth, (req, res) => {
 app.put('/api/geofence', apiAuth, (req, res) => {
   const f = cleanFence(req.body);
   if (!f) return res.status(400).json({ error: 'Invalid geofence. Circles need a centre and 20 m to 20 km radius; polygons need 3 or more points.' });
+  const previous = geofence;
   geofence = f;
+  if (!saveStore()) {
+    geofence = previous;
+    return res.status(503).json({ error: 'Geofence could not be saved. Check server storage configuration.' });
+  }
   for (const [id, c] of live) {                // re-baseline silently so editing the fence never fakes a logout
     if (c.lat != null) { c.inside = insideFence(c.lat, c.lng); c.cand = null; c.streak = 0; }
     c.trail = c.inside ? (c.lat != null ? [[c.lat, c.lng]] : []) : [];
   }
-  saveStore();
   emit('fence', geofence);
   emit('registry', registryPayload());
   res.json({ ok: true });
@@ -318,6 +396,7 @@ app.get('/healthz', (req, res) => res.send('ok'));
 app.get('/login', (req, res) => (authed(req) ? res.redirect('/admin') : res.sendFile(path.join(pubDir, 'login.html'))));
 app.get('/admin', pageAuth, (req, res) => res.sendFile(path.join(pubDir, 'admin.html')));
 app.get('/register', pageAuth, (req, res) => res.sendFile(path.join(pubDir, 'register.html')));
+app.get('/track', (req, res) => res.sendFile(path.join(pubDir, 'track.html')));
 app.use((req, res) => res.status(404).send('Not found'));
 
 setInterval(() => {                             // forget unregistered cards that went quiet

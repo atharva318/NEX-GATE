@@ -30,7 +30,7 @@
 
     <div class="lede">
       <h1>Give a student a card that clocks them in and out</h1>
-      <p>Switch on the ESP32-C3 card with the student's phone hotspot nearby. It shows up below within a few seconds. Pick it, add the student's details, and it is live on the map.</p>
+      <p>Switch on the ESP32 card with its student's phone hotspot nearby. It appears below within a few seconds. Register each card once, then create a secure phone GPS link for it.</p>
 
       <div class="detected">
         <h2>Cards waiting to be registered <span class="chip in" id="dCount">0</span></h2>
@@ -55,11 +55,20 @@
       <button class="btn sm" id="bk" title="Copy a JSON backup you can paste into the STORE_SEED setting on Render">Copy backup</button>
     </div>
     <div class="tablewrap"><table>
-      <thead><tr><th>Student</th><th>Department</th><th>Card ID</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Student</th><th>Department</th><th>Card ID</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
   </section>
 </main>
+
+<dialog class="gpsDialog" id="gpsDialog">
+  <form method="dialog"><button class="btn quiet sm gpsClose" aria-label="Close">Close</button></form>
+  <h2>Pair phone GPS</h2>
+  <p>Open this secure link on the phone connected to this card’s hotspot. Allow location and keep the page open while the card is used.</p>
+  <input id="gpsLink" readonly aria-label="Secure phone GPS link">
+  <div class="row"><button class="btn primary sm" id="gpsCopy" type="button">Copy link</button><button class="btn sm" id="gpsShare" type="button">Share link</button></div>
+  <small>Create a fresh link if this one is lost; creating another link invalidates the previous one.</small>
+</dialog>
 
 <script src="/assets/common.js"></script>
 <script src="/assets/register.js"></script>

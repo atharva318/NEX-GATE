@@ -222,7 +222,29 @@ tbody tr.new{animation:evIn .8s}
 td .who{display:flex;gap:12px;align-items:center}
 td .who b{display:block;font-weight:600}td .who small{color:var(--mute)}
 .idtxt{font-weight:600;letter-spacing:.04em}
+.registryActions{display:flex;justify-content:flex-end;gap:8px;white-space:nowrap}
+.gpsDialog{width:min(480px,calc(100vw - 28px));margin:auto;padding:24px;border:1px solid var(--line2);border-radius:16px;background:var(--ink2);color:var(--fog);box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.gpsDialog::backdrop{background:rgba(0,0,0,.68);backdrop-filter:blur(3px)}
+.gpsDialog h2{font-size:21px;margin:6px 0}
+.gpsDialog p,.gpsDialog>small{display:block;color:var(--mute);margin:8px 0 14px}
+.gpsDialog input{width:100%;margin-bottom:12px;padding:10px;background:var(--ink);border:1px solid var(--line2);border-radius:9px}
+.gpsDialog .row{display:flex;gap:8px}
+.gpsClose{float:right}
 @media (max-width:860px){.hero{grid-template-columns:1fr;gap:30px}.form{grid-template-columns:1fr}.bar .live{display:none}}
+
+/* ======================= PHONE GPS TRACKER ======================= */
+body.trackPage{min-height:100%;display:grid;place-items:center;padding:20px;background:radial-gradient(ellipse at 50% 0%,#16253f 0,var(--ink) 70%)}
+.trackCard{width:min(480px,100%);padding:26px;border:1px solid var(--line2);border-radius:20px;background:rgba(16,28,49,.92);box-shadow:0 24px 70px rgba(0,0,0,.4)}
+.trackCard .brand{margin-bottom:26px}
+.trackCard h1{font-size:24px;line-height:1.2;margin-bottom:8px}
+.trackCard>p{color:var(--mute)}
+.trackStatus{margin:20px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--ink);font-weight:600}
+.trackStatus.ok{color:var(--lagoon);border-color:rgba(63,224,197,.35)}
+.trackStatus.err{color:var(--coral);border-color:rgba(255,107,122,.35)}
+.trackCard dl{display:grid;grid-template-columns:1fr auto;gap:6px 12px}
+.trackCard dt,.trackNote{color:var(--mute)}
+.trackCard dd{text-align:right;font-weight:600}
+.trackCard .trackNote{font-size:12px;margin-top:22px}
 
 /* ======================= LOGIN ======================= */
 body.gate{display:grid;place-items:center;min-height:100%;overflow:hidden}

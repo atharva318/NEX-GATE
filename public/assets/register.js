@@ -39,15 +39,47 @@
       return `<tr class="${c.id === newId ? 'new' : ''}"><td><div class="who"><div class="av ${st}">${esc(initials(c.name))}</div><div><b>${esc(c.name)}</b><small>${esc(c.roll || 'No roll number')}</small></div></div></td>
         <td>${esc(c.dept || '-')}</td><td class="idtxt">${esc(c.id)}</td>
         <td><span class="chip ${st}">${STATUS_LABEL[st]}</span> <small style="color:var(--mute)">${c.lastSeen ? ago(c.lastSeen) : ''}</small></td>
-        <td style="text-align:right"><button class="btn danger sm" data-del="${esc(c.id)}">Remove</button></td></tr>`;
+        <td class="registryActions"><button class="btn sm" data-gps="${esc(c.id)}">Phone GPS link</button><button class="btn danger sm" data-del="${esc(c.id)}">Remove</button></td></tr>`;
     }).join('') : `<tr><td colspan="5"><div class="empty"><b>${cards.length ? 'No matches' : 'No cards registered yet'}</b>${cards.length ? 'Try a different search.' : 'Register the first student card using the form above.'}</div></td></tr>`;
   }
   $('#q').oninput = renderRows;
   $('#rows').onclick = async (e) => {
+    const gpsButton = e.target.closest('[data-gps]');
+    if (gpsButton) {
+      const id = gpsButton.dataset.gps;
+      gpsButton.disabled = true;
+      try {
+        const result = await api('/api/cards/' + encodeURIComponent(id) + '/tracker', 'POST');
+        $('#gpsLink').value = result.url;
+        $('#gpsDialog').showModal();
+      } catch (error) {
+        toast('Could not create GPS link', error.message, 'err');
+      } finally {
+        gpsButton.disabled = false;
+      }
+      return;
+    }
     const id = e.target.dataset.del; if (!id) return;
     const c = cards.find((x) => x.id === id);
     if (!confirm(`Remove ${c ? c.name : id}? Their card stops being tracked.`)) return;
     try { await api('/api/cards/' + encodeURIComponent(id), 'DELETE'); toast('Card removed', c ? c.name : id); } catch (er) { toast('Could not remove card', er.message, 'err'); }
+  };
+  $('#gpsCopy').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($('#gpsLink').value);
+      toast('GPS link copied', 'Open it on the phone paired with this card.');
+    } catch (error) {
+      $('#gpsLink').select();
+      toast('Select and copy the link', 'Your browser did not allow clipboard access.', 'err');
+    }
+  };
+  $('#gpsShare').onclick = async () => {
+    try {
+      if (!navigator.share) throw new Error('Sharing is not supported by this browser.');
+      await navigator.share({ title: 'NEX-GATE phone GPS link', url: $('#gpsLink').value });
+    } catch (error) {
+      if (error.name !== 'AbortError') toast('Could not share GPS link', error.message, 'err');
+    }
   };
 
   /* submit */
@@ -65,7 +97,7 @@
     try {
       const r = await api('/api/cards', 'POST', { id: f.id.value.trim(), name: f.name.value.trim(), roll: f.roll.value.trim(), dept: f.dept.value.trim() });
       newId = r.card.id; setTimeout(() => { newId = null; }, 1500);
-      toast('Card registered', r.card.name + ' is now on the live map.', 'in'); clearForm();
+      toast('Card registered', r.card.name + ' is saved. Set up its Phone GPS link next.', 'in'); clearForm();
     } catch (er) { toast('Could not register card', er.message, 'err'); }
     b.disabled = false;
   };
@@ -76,7 +108,7 @@
     try {
       const txt = JSON.stringify(await api('/api/backup'));
       await navigator.clipboard.writeText(txt);
-      toast('Backup copied', 'Paste it into the STORE_SEED setting on Render to keep cards across restarts.');
+      toast('Backup copied', 'For Render Free, paste it into STORE_SEED after card or GPS-link changes to keep them across restarts.');
     } catch (e) { toast('Could not copy backup', e.message, 'err'); }
   };
 
